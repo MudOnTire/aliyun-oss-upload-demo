@@ -112,4 +112,20 @@ async function getCredential(req, res, next) {
 }
 ```
 
-其中，access key 和 access key secret 保存在`.env`文件中。`sts.assumeRole()`返回的即为 STS Token。
+其中，access key 和 access key secret 保存在`.env`文件中。`sts.assumeRole()`返回的即为 STS Token，方法接收的四个参数分别为：**role arn**, **policy**, **expiration**, **session name**。
+
+Role arn 可以从 RAM 角色的详情页面获取：
+
+![role arn](http://lc-jOYHMCEn.cn-n1.lcfile.com/824fcced9c2c55acd5fc/role%20arn.png)
+
+Policy 是自定义的策略，由于已经为角色添加了权限策略，所以可以传`null`。
+
+Expiration 是 STS Token 的过期时间，应该在 15min ~ 60min 之间。当 Token 失效时前端需要重新获取。
+
+Session name 为自定义的一个会话名称。
+
+后端实现完成！
+
+# 前端实现
+
+本文的前端实现基于 React + ant design pro。
