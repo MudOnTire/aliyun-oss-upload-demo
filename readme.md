@@ -14,7 +14,7 @@
 
 首先，我们创建一个 bucket，一个存储文件的容器：
 
-![add bucket](http://lc-jOYHMCEn.cn-n1.lcfile.com/08231d98da63e37edc3d/%E5%A2%9E%E5%80%BC%E4%B8%9A%E5%8A%A1-%E7%BB%9F%E8%AE%A1-H5.jpg)
+![add bucket](http://lc-jOYHMCEn.cn-n1.lcfile.com/6a53e49f988565422478/bucket%20set%20cros.png)
 
 接着，我们需要给 bucket 设置跨域，这样我们才能在网页中调用 ali-oss 的 SDK：
 
