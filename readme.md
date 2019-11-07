@@ -6,7 +6,7 @@
 
 前端上传文件到阿里云的相关操作可参考：[浏览器端上传文件](https://help.aliyun.com/document_detail/64047.html?spm=a2c4g.11174283.6.1195.1ee57da2srMUQS)
 
-了解以上概念之后，接下来我们可以去阿里云 OSS 的控制台进行相关的设置（前提开通了 OSS 服务）。
+了解以上概念之后，接下来可以去阿里云 OSS 的控制台进行相关的设置了（前提是开通了 OSS 服务）。
 
 # 阿里云 OSS 控制台配置
 
@@ -16,7 +16,7 @@
 
 ![add bucket](http://lc-jOYHMCEn.cn-n1.lcfile.com/6a53e49f988565422478/bucket%20set%20cros.png)
 
-接着，我们需要给 bucket 设置跨域，这样我们才能在网页中调用 ali-oss 的 SDK：
+接着，我们需要给 bucket 设置跨域，这样我们才能在网页中调用 Aliyun OSS 服务器的接口：
 
 ![bucket set cros](http://lc-jOYHMCEn.cn-n1.lcfile.com/6a53e49f988565422478/bucket%20set%20cros.png)
 
@@ -114,15 +114,15 @@ async function getCredential(req, res, next) {
 
 其中，access key 和 access key secret 保存在`.env`文件中。`sts.assumeRole()`返回的即为 STS Token，方法接收的四个参数分别为：**role arn**, **policy**, **expiration**, **session name**。
 
-Role arn 可以从 RAM 角色的详情页面获取：
+**Role arn** 可以从 RAM 角色的详情页面获取：
 
 ![role arn](http://lc-jOYHMCEn.cn-n1.lcfile.com/824fcced9c2c55acd5fc/role%20arn.png)
 
-Policy 是自定义的策略，由于已经为角色添加了权限策略，所以可以传`null`。
+**Policy** 是自定义的策略，由于已经为角色添加了权限策略，所以可以传`null`。
 
-Expiration 是 STS Token 的过期时间，应该在 15min ~ 60min 之间。当 Token 失效时前端需要重新获取。
+**Expiration** 是 STS Token 的过期时间，应该在 15min ~ 60min 之间。当 Token 失效时前端需要重新获取。
 
-Session name 为自定义的一个会话名称。
+**Session name** 为自定义的一个会话名称。
 
 后端实现完成！
 
