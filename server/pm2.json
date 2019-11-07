@@ -1,0 +1,11 @@
+{
+  "apps": [
+    {
+      "name": "aliyunb-oss-upload",
+      "watch": true,
+      "script": "./index.js",
+      "instances": 2,
+      "exec_mode": "cluster"
+    }
+  ]
+}
