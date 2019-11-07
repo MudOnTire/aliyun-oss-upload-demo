@@ -6,16 +6,14 @@ const sts = new STS({
   accessKeySecret: process.env.ALIYUN_OSS_RULE_ASSUMER_ACCESS_KEY_SECRET
 });
 
-async function assumeRole() {
-  let res = await sts.assumeRole(
-    'acs:ram::1582938330607257:role/uploader', null, 15 * 60, 'web-client');
-  const { credentials } = res;
-  return credentials;
-}
-
 async function getCredential(req, res, next) {
   try {
-    const credential = await assumeRole();
+    const { credential } = await sts.assumeRole(
+      'acs:ram::1582938330607257:role/uploader', // role arn
+      null, // policy
+      15 * 60, // expiration(s)
+      'web-client' // session-name
+    );;
     req.result = credential;
     next();
   } catch (err) {
