@@ -8,13 +8,13 @@ const sts = new STS({
 
 async function getCredential(req, res, next) {
   try {
-    const { credential } = await sts.assumeRole(
-      'acs:ram::1582938330607257:role/uploader', // role arn
+    const { credentials } = await sts.assumeRole(
+      'acs:ram::1582938330607257:role/uploader',  // role arn
       null, // policy
-      15 * 60, // expiration(s)
-      'web-client' // session-name
-    );;
-    req.result = credential;
+      15 * 60, // expiration
+      'web-client' // session name
+    );
+    req.result = credentials;
     next();
   } catch (err) {
     next(err);

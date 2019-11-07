@@ -1,6 +1,6 @@
-import { uploadService } from '@/services/upload';
 import OSS from 'ali-oss';
 import shortid from 'shortid';
+import { uploadService } from '@/services/upload';
 
 const bucket = 'mudontire-test';
 const region = 'oss-cn-shanghai';
@@ -17,11 +17,11 @@ export default {
   },
 
   effects: {
-    *getCredential({ success }, { call, put, select }) {
+    *getCredential({ success }, { call, put }) {
       const res = yield call(uploadService.getCredential);
       if (res.code === 0) {
         const credentials = res.result;
-        const { AccessKeyId, AccessKeySecret, Expiration, SecurityToken } = credentials;
+        const { AccessKeyId, AccessKeySecret, SecurityToken } = credentials;
         // 创建client并保存
         const ossClient = new OSS({
           accessKeyId: AccessKeyId,

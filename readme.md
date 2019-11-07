@@ -14,7 +14,7 @@
 
 首先，我们创建一个 bucket，一个存储文件的容器：
 
-![add bucket](http://lc-jOYHMCEn.cn-n1.lcfile.com/6a53e49f988565422478/bucket%20set%20cros.png)
+![add bucket](http://lc-jOYHMCEn.cn-n1.lcfile.com/9a534cb162ad68141efb/add%20bucket.png)
 
 接着，我们需要给 bucket 设置跨域，这样我们才能在网页中调用 Aliyun OSS 服务器的接口：
 
@@ -98,13 +98,13 @@ const sts = new STS({
 
 async function getCredential(req, res, next) {
   try {
-    const { credential } = await sts.assumeRole(
-      'acs:ram::1582938330607257:role/uploader', // role arn
+    const { credentials } = await sts.assumeRole(
+      'acs:ram::1582938330607257:role/uploader',  // role arn
       null, // policy
-      15 * 60, // expiration(s)
-      'web-client' // session-name
-    );;
-    req.result = credential;
+      15 * 60, // expiration
+      'web-client' // session name
+    );
+    req.result = credentials;
     next();
   } catch (err) {
     next(err);
@@ -128,4 +128,8 @@ async function getCredential(req, res, next) {
 
 # 前端实现
 
-本文的前端实现基于 React + ant design pro。
+本文的前端实现基于 React + Ant design pro。最终效果如下：
+
+![preview](http://lc-jOYHMCEn.cn-n1.lcfile.com/31f41d355e72a67091e5/1.preview.png)
+
+针对 Andt 的 [Upload](https://ant.design/components/upload-cn/)控件进行了简单的封装，当添加文件的时候不会立即上传，而要等到点击“提交”按钮时再上传。
