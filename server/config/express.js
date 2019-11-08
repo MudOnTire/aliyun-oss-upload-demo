@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const logger = require('morgan');
 const bodyParser = require('body-parser');
@@ -66,8 +67,12 @@ if (config.env === 'development') {
 // mount all routes on /api path
 app.use('/api', routes);
 
+// 页面
+const pages = path.resolve(__dirname, '../pages');
+app.use(express.static(pages));
+
 // 统一处理
-app.use((req, res, next) => {
+app.use((req, res) => {
   res.send({
     code: 0,
     result: req.result

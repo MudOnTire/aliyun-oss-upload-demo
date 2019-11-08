@@ -1,0 +1,20 @@
+{
+  "vendors.css": "/vendors.chunk.css",
+  "vendors.js": "/vendors.async.js",
+  "1.async.js": "/1.async.js",
+  "umi.css": "/umi.css",
+  "umi.js": "/umi.js",
+  "3.chunk.css": "/3.chunk.css",
+  "3.async.js": "/3.async.js",
+  "4.chunk.css": "/4.chunk.css",
+  "4.async.js": "/4.async.js",
+  "5.chunk.css": "/5.chunk.css",
+  "5.async.js": "/5.async.js",
+  "6.async.js": "/6.async.js",
+  "7.async.js": "/7.async.js",
+  "8.async.js": "/8.async.js",
+  "9.async.js": "/9.async.js",
+  "color.less": "/color.less",
+  "favicon.png": "/favicon.png",
+  "index.html": "/index.html"
+}
