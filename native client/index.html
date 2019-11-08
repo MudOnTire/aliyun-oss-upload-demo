@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    div {
+      margin: 100px auto 0;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div>
+    <input type="file" id='commonUploadInput'>
+    <button id="commonUploadBtn" onclick="commonUpload()">Common Upload</button>
+    <div class="progress"></div>
+  </div>
+  <div>
+    <input type="file" id='multipartUploadInput'>
+    <button id="multipartUploadBtn" onclick="multipartUpload()">Multipart Upload</button>
+    <div class="progress"></div>
+  </div>
+
+  <script src="./uuid_v4@latest.js"></script>
+  <script>
+
+    const bucket = 'mudontire-test';
+    const region = 'oss-cn-shanghai';
+    const ossClient = null;
+    const commonUploadInput = document.getElementById('commonUploadInput');
+    const multipartUploadInput = document.getElementById('multipartUploadInput');
+
+    // 获取STS Token
+    function getCredential() {
+      return fetch('http://localhost:5050/api/upload/credential')
+        .then(res => {
+          return res.json()
+        })
+        .then(res => {
+          return res;
+        })
+        .catch(err => {
+          console.error(err);
+        });
+    }
+
+    // 普通上传
+    async function commonUpload() {
+      if (!ossClient) {
+        const { result } = await getCredential();
+        console.log('credentials === ', result);
+        const { AccessKeyId, AccessKeySecret, SecurityToken } = result;
+        ossClient = new OSS({
+          accessKeyId: AccessKeyId,
+          accessKeySecret: AccessKeySecret,
+          stsToken: SecurityToken,
+          bucket,
+          region
+        });
+      }
+      const { files } = commonUploadInput;
+      const tasks = files.map(file => {
+        return ossClient.put(`${shortid.generate()}-${file.name}`, file);
+      });
+      Promise.all(tasks).then(result => {
+        console.log('upload result ==== ', result);
+        if (callback) callback(result);
+      }).catch(err => {
+        console.log('upload error === ', err);
+      });
+    }
+
+    function multipartUpload() {
+      if (files && files.length > 0) {
+        const tasks = files.map(file => {
+          return ossClient.put(`${shortid.generate()}-${file.name}`, file);
+        });
+        Promise.all(tasks).then(result => {
+          console.log('upload result ==== ', result);
+          if (callback) callback(result);
+        }).catch(err => {
+          console.log('upload error === ', err);
+        });
+      }
+    }
+
+  </script>
+</body>
+
+</html>
