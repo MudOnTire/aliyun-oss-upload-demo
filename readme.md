@@ -128,8 +128,8 @@ async function getCredential(req, res, next) {
 
 # 前端实现
 
-本文的前端实现基于 React + Ant design pro。最终效果如下：
+<!-- 本文的前端实现基于 React + Ant design pro。最终效果如下：
 
 ![preview](http://lc-jOYHMCEn.cn-n1.lcfile.com/31f41d355e72a67091e5/1.preview.png)
 
-针对 Andt 的 [Upload](https://ant.design/components/upload-cn/)控件进行了简单的封装，当添加文件的时候不会立即上传，而要等到点击“提交”按钮时再上传。
+针对 Andt 的 [Upload](https://ant.design/components/upload-cn/)控件进行了简单的封装，当添加文件的时候不会立即上传，而要等到点击“提交”按钮时再上传。 -->
