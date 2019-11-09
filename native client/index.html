@@ -11,30 +11,41 @@
       margin: 100px auto 0;
       text-align: center;
     }
+
+    button {
+      margin: 0 10px;
+    }
+
+    #status {
+      margin-top: 20px;
+      text-align: center;
+    }
   </style>
 </head>
 
 <body>
-
   <div>
-    <input type="file" id='commonUploadInput'>
-    <button id="commonUploadBtn" onclick="commonUpload()">Common Upload</button>
-    <div class="progress"></div>
-  </div>
-  <div>
-    <input type="file" id='multipartUploadInput'>
-    <button id="multipartUploadBtn" onclick="multipartUpload()">Multipart Upload</button>
-    <div class="progress"></div>
+    <input type="file" id='fileInput' multiple='true'>
+    <button id="uploadBtn" onclick="upload()">Upload</button>
+    <button id="stopBtn" onclick="stop()">Stop</button>
+    <button id="resumeBtn" onclick="resume()">resume</button>
+    <h2 id='status'></h2>
   </div>
 
-  <script src="./uuid_v4@latest.js"></script>
+  <script src="./js/uuid_v4@latest.js"></script>
+  <script src="./js/moment.min.js"></script>
+  <script src="./js/aliyun-oss-sdk.js"></script>
   <script>
 
+    let credentials = null;
+    let ossClient = null;
+    const fileInput = document.getElementById('fileInput');
+    const status = document.getElementById('status');
     const bucket = 'mudontire-test';
     const region = 'oss-cn-shanghai';
-    const ossClient = null;
-    const commonUploadInput = document.getElementById('commonUploadInput');
-    const multipartUploadInput = document.getElementById('multipartUploadInput');
+    const partSize = 1024 * 1024; // 每个分片大小
+    const parallel = 3; // 同时上传的分片数
+    const checkpoints = {}; // 所有分片上传文件的检查点
 
     // 获取STS Token
     function getCredential() {
@@ -43,53 +54,121 @@
           return res.json()
         })
         .then(res => {
-          return res;
+          console.log('credentials === ', res);
+          credentials = res.result;
         })
         .catch(err => {
           console.error(err);
         });
     }
 
+    // 创建OSS Client
+    async function initOSSClient() {
+      const { AccessKeyId, AccessKeySecret, SecurityToken } = credentials;
+      ossClient = new OSS({
+        accessKeyId: AccessKeyId,
+        accessKeySecret: AccessKeySecret,
+        stsToken: SecurityToken,
+        bucket,
+        region
+      });
+    }
+
+    // 点击上传按钮
+    async function upload() {
+      status.innerText = 'Uploading';
+      // 获取STS Token
+      await getCredential();
+      const { files } = fileInput;
+      const fileList = Array.from(files);
+      const uploadTasks = fileList.forEach(file => {
+        // 如果文件大学小于分片大小，使用普通上传
+        if (file.size < partSize) {
+          commonUpload(file);
+        } else {
+          multipartUpload(file);
+        }
+      });
+    }
+
     // 普通上传
-    async function commonUpload() {
+    async function commonUpload(file) {
       if (!ossClient) {
-        const { result } = await getCredential();
-        console.log('credentials === ', result);
-        const { AccessKeyId, AccessKeySecret, SecurityToken } = result;
-        ossClient = new OSS({
-          accessKeyId: AccessKeyId,
-          accessKeySecret: AccessKeySecret,
-          stsToken: SecurityToken,
-          bucket,
-          region
-        });
+        await initOSSClient();
       }
-      const { files } = commonUploadInput;
-      const tasks = files.map(file => {
-        return ossClient.put(`${shortid.generate()}-${file.name}`, file);
-      });
-      Promise.all(tasks).then(result => {
-        console.log('upload result ==== ', result);
-        if (callback) callback(result);
+      const fileName = `${uuidv4()}-${file.name}`;
+      return ossClient.put(fileName, file).then(result => {
+        console.log(`Common upload ${file.name} succeeded, result === `, result)
       }).catch(err => {
-        console.log('upload error === ', err);
+        console.log(`Common upload ${file.name} failed === `, err);
       });
     }
 
-    function multipartUpload() {
-      if (files && files.length > 0) {
-        const tasks = files.map(file => {
-          return ossClient.put(`${shortid.generate()}-${file.name}`, file);
-        });
-        Promise.all(tasks).then(result => {
-          console.log('upload result ==== ', result);
-          if (callback) callback(result);
+    // 分片上传
+    async function multipartUpload(file) {
+      if (!ossClient) {
+        await initOSSClient();
+      }
+      const fileName = `${uuidv4()}-${file.name}`;
+      return ossClient.multipartUpload(fileName, file, {
+        parallel,
+        partSize,
+        progress: onMultipartUploadProgress
+      }).then(result => {
+        const url = `http://${bucket}.${region}.aliyuncs.com/${fileName}`;
+        console.log(`Multipart upload ${file.name} succeeded, url === `, url)
+      }).catch(err => {
+        console.log(`Multipart upload ${file.name} failed === `, err);
+      });
+    }
+
+    // 断点续传
+    async function resumeMultipartUpload() {
+      Object.values(checkpoints).forEach((checkpoint) => {
+        const { uploadId, file, name } = checkpoint;
+        ossClient.multipartUpload(uploadId, file, {
+          parallel,
+          partSize, // 每个part 1MB
+          progress: onMultipartUploadProgress,
+          checkpoint
+        }).then(result => {
+          console.log('before delete checkpoints === ', checkpoints);
+          delete checkpoints[checkpoint.uploadId];
+          console.log('after delete checkpoints === ', checkpoints);
+          const url = `http://${bucket}.${region}.aliyuncs.com/${name}`;
+          console.log(`Resume multipart upload ${file.name} succeeded, url === `, url)
         }).catch(err => {
-          console.log('upload error === ', err);
+          console.log('Resume multipart upload failed === ', err);
         });
+      });
+    }
+
+    // 分片上传进度改变回调
+    async function onMultipartUploadProgress(progress, checkpoint) {
+      console.log(`${checkpoint.file.name} 上传进度 ${progress}`);
+      checkpoints[checkpoint.uploadId] = checkpoint;
+      // 判断STS Token是否将要过期，过期则重新获取
+      const { Expiration } = credentials;
+      const timegap = 14;
+      if (Expiration && moment(Expiration).subtract(timegap, 'minute').isBefore(moment())) {
+        console.log(`STS token will expire in ${timegap} minutes，uploading will pause and resume after getting new STS token`);
+        if (ossClient) {
+          ossClient.cancel();
+        }
+        await getCredential();
+        await resumeMultipartUpload();
       }
     }
 
+    function stop() {
+      status.innerText = 'Stopping';
+      if (ossClient) ossClient.cancel();
+    }
+
+    function resume() {
+      status.innerText = 'Resuming';
+      if (ossClient) resumeMultipartUpload();
+    }
   </script>
 </body>
 
