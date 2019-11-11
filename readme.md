@@ -1,6 +1,6 @@
 关于阿里云 OSS 的介绍请参考官方文档：[阿里云 OSS](https://help.aliyun.com/document_detail/31817.html?spm=a2c4g.11174283.2.2.1ee57da2B2809C)。
 
-出于账号安全的考虑，前端使用 OSS 服务需要走临时授权，即拿一个临时凭证去调用 aliyun-oss SDK。关于临时授权请参考：[RAM 和 STS 介绍](https://help.aliyun.com/document_detail/102082.html?spm=a2c4g.11186623.3.3.5cb51388OvZZUX)，[RAM 子账号](https://help.aliyun.com/document_detail/100602.html?spm=a2c4g.11186623.6.655.b38744fdJgsicc)，[STS 临时授权访问 OSS](https://help.aliyun.com/document_detail/100624.html?spm=a2c4g.11186623.6.656.72b24cf7VmpLx7)。
+出于账号安全的考虑，前端使用 OSS 服务需要走临时授权，即拿一个临时凭证（STS Token）去调用 aliyun-oss SDK。关于临时授权请参考：[RAM 和 STS 介绍](https://help.aliyun.com/document_detail/102082.html?spm=a2c4g.11186623.3.3.5cb51388OvZZUX)，[RAM 子账号](https://help.aliyun.com/document_detail/100602.html?spm=a2c4g.11186623.6.655.b38744fdJgsicc)，[STS 临时授权访问 OSS](https://help.aliyun.com/document_detail/100624.html?spm=a2c4g.11186623.6.656.72b24cf7VmpLx7)。
 
 以 NodeJs 为例，后端给前端颁发临时凭证的实现可参考：[Node STS 授权访问](https://help.aliyun.com/document_detail/32077.html?spm=a2c4g.11186623.6.1181.7d341a9asC4enK)
 
@@ -77,7 +77,7 @@
 
 # 后端实现
 
-由于是前端负责上传，所以后端的任务比较简单，就是提供一个 STS Token 给前端。本文以 NodeJs 为例，展示后端实现。
+由于是前端负责上传，所以后端的任务比较简单，就是提供一个 STS Token 给前端。本文以 NodeJs 为例实现如下。
 
 ## 1. 安装 aliyun-oss SDK
 
@@ -315,14 +315,16 @@ async function onMultipartUploadProgress(progress, checkpoint) {
 }
 ```
 
-# 11. 暂停、续传按钮点击事件
+## 11. 暂停、续传按钮点击事件
 
 ```
+// 暂停上传
 function stop() {
   status.innerText = 'Stopping';
   if (ossClient) ossClient.cancel();
 }
 
+// 续传
 function resume() {
   status.innerText = 'Resuming';
   if (ossClient) resumeMultipartUpload();
