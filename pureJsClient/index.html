@@ -37,12 +37,12 @@
   <script src="./js/aliyun-oss-sdk.js"></script>
   <script>
 
-    let credentials = null;
-    let ossClient = null;
-    const fileInput = document.getElementById('fileInput');
-    const status = document.getElementById('status');
-    const bucket = 'mudontire-test';
-    const region = 'oss-cn-shanghai';
+    let credentials = null; // STS凭证
+    let ossClient = null; // oss客户端实例
+    const fileInput = document.getElementById('fileInput'); // 文件选择器
+    const status = document.getElementById('status'); // 状态显示元素
+    const bucket = 'mudontire-test'; // bucket名称
+    const region = 'oss-cn-shanghai'; // oss服务区域名称
     const partSize = 1024 * 1024; // 每个分片大小
     const parallel = 3; // 同时上传的分片数
     const checkpoints = {}; // 所有分片上传文件的检查点

@@ -1,6 +1,6 @@
 关于阿里云 OSS 的介绍请参考官方文档：[阿里云 OSS](https://help.aliyun.com/document_detail/31817.html?spm=a2c4g.11174283.2.2.1ee57da2B2809C)。
 
-出于账号安全的考虑，前端使用 OSS 服务需要走临时授权，即拿一个临时凭证去 OSS SDK。关于临时授权请参考：[RAM 和 STS 介绍](https://help.aliyun.com/document_detail/102082.html?spm=a2c4g.11186623.3.3.5cb51388OvZZUX)，[RAM 子账号](https://help.aliyun.com/document_detail/100602.html?spm=a2c4g.11186623.6.655.b38744fdJgsicc)，[STS 临时授权访问 OSS](https://help.aliyun.com/document_detail/100624.html?spm=a2c4g.11186623.6.656.72b24cf7VmpLx7)。
+出于账号安全的考虑，前端使用 OSS 服务需要走临时授权，即拿一个临时凭证去调用 aliyun-oss SDK。关于临时授权请参考：[RAM 和 STS 介绍](https://help.aliyun.com/document_detail/102082.html?spm=a2c4g.11186623.3.3.5cb51388OvZZUX)，[RAM 子账号](https://help.aliyun.com/document_detail/100602.html?spm=a2c4g.11186623.6.655.b38744fdJgsicc)，[STS 临时授权访问 OSS](https://help.aliyun.com/document_detail/100624.html?spm=a2c4g.11186623.6.656.72b24cf7VmpLx7)。
 
 以 NodeJs 为例，后端给前端颁发临时凭证的实现可参考：[Node STS 授权访问](https://help.aliyun.com/document_detail/32077.html?spm=a2c4g.11186623.6.1181.7d341a9asC4enK)
 
@@ -34,7 +34,7 @@
 
 ## 3. 创建 RAM 角色
 
-该角色即有权限在前端调用 ali-oss SDK 上传文件的用户角色，例如我们创建一个只有上传权限的角色，命名为 uploader：
+该角色即有权限在前端调用 aliyun-oss SDK 上传文件的用户角色，例如我们创建一个只有上传权限的角色，命名为 uploader：
 
 ![ram role](http://lc-jOYHMCEn.cn-n1.lcfile.com/ff64b8c57ae0c0d2e3f6/ram%20role.png)
 
@@ -79,7 +79,7 @@
 
 由于是前端负责上传，所以后端的任务比较简单，就是提供一个 STS Token 给前端。本文以 NodeJs 为例，展示后端实现。
 
-## 1. 安装 ali-oss SDK
+## 1. 安装 aliyun-oss SDK
 
 ```
 npm install ali-oss
@@ -133,3 +133,202 @@ async function getCredential(req, res, next) {
 ![preview](http://lc-jOYHMCEn.cn-n1.lcfile.com/31f41d355e72a67091e5/1.preview.png)
 
 针对 Andt 的 [Upload](https://ant.design/components/upload-cn/)控件进行了简单的封装，当添加文件的时候不会立即上传，而要等到点击“提交”按钮时再上传。 -->
+
+本文前端实现使用原生 JS，另外还有 ant design pro 的版本请参考 github 项目。
+
+前端实现有几个关键点：
+
+1. 调用 aliyun-oss SDK 之前获取 STS Token
+1. 定义上传分片大小，如果文件小于分片大小则使用普通上传，否则使用分片上传
+1. 上传过程中能展示上传进度
+1. 上传过程中，如果 STS Token 快过期了，则先暂停上传重新获取 Token，接着进行断点续传
+1. 支持手动暂停、续传功能
+1. 上传完成后返回文件对应的下载地址
+
+## 1. 引入 aliyun-oss SDK
+
+参考 [引入 aliyun-oss SDK](https://help.aliyun.com/document_detail/64041.html?spm=a2c4g.11186623.6.1190.6bec10d58JDHOp)
+
+## 2. HTML
+
+HTML 中包含文件选择器，上传、暂停、续传按钮，状态显示：
+
+```
+<div>
+  <input type="file" id='fileInput' multiple='true'>
+  <button id="uploadBtn" onclick="upload()">Upload</button>
+  <button id="stopBtn" onclick="stop()">Stop</button>
+  <button id="resumeBtn" onclick="resume()">resume</button>
+  <h2 id='status'></h2>
+</div>
+```
+
+## 3. 定义变量
+
+```
+let credentials = null; // STS凭证
+let ossClient = null; // oss客户端实例
+const fileInput = document.getElementById('fileInput'); // 文件选择器
+const status = document.getElementById('status'); // 状态显示元素
+const bucket = 'mudontire-test'; // bucket名称
+const region = 'oss-cn-shanghai'; // oss服务区域名称
+const partSize = 1024 * 1024; // 每个分片大小(byte)
+const parallel = 3; // 同时上传的分片数
+const checkpoints = {}; // 所有分片上传文件的检查点
+```
+
+## 4. 获取 STS 凭证，创建 OSS Client
+
+```
+// 获取STS Token
+function getCredential() {
+  return fetch('http://localhost:5050/api/upload/credential')
+    .then(res => {
+      return res.json()
+    })
+    .then(res => {
+      credentials = res.result;
+    })
+    .catch(err => {
+      console.error(err);
+    });
+}
+
+// 创建OSS Client
+async function initOSSClient() {
+  const { AccessKeyId, AccessKeySecret, SecurityToken } = credentials;
+  ossClient = new OSS({
+    accessKeyId: AccessKeyId,
+    accessKeySecret: AccessKeySecret,
+    stsToken: SecurityToken,
+    bucket,
+    region
+  });
+}
+```
+
+## 5. 点击上传按钮事件
+
+```
+async function upload() {
+  status.innerText = 'Uploading';
+  // 获取STS Token
+  await getCredential();
+  const { files } = fileInput;
+  const fileList = Array.from(files);
+  const uploadTasks = fileList.forEach(file => {
+    // 如果文件大学小于分片大小，使用普通上传，否则使用分片上传
+    if (file.size < partSize) {
+      commonUpload(file);
+    } else {
+      multipartUpload(file);
+    }
+  });
+}
+```
+
+## 6. 普通上传
+
+```
+// 普通上传
+async function commonUpload(file) {
+  if (!ossClient) {
+    await initOSSClient();
+  }
+  const fileName = file.name;
+  return ossClient.put(fileName, file).then(result => {
+    console.log(`Common upload ${file.name} succeeded, result === `, result)
+  }).catch(err => {
+    console.log(`Common upload ${file.name} failed === `, err);
+  });
+}
+```
+
+## 7. 分片上传
+
+```
+// 分片上传
+async function multipartUpload(file) {
+  if (!ossClient) {
+    await initOSSClient();
+  }
+  const fileName = file.name;
+  return ossClient.multipartUpload(fileName, file, {
+    parallel,
+    partSize,
+    progress: onMultipartUploadProgress
+  }).then(result => {
+    // 生成文件下载地址
+    const url = `http://${bucket}.${region}.aliyuncs.com/${fileName}`;
+    console.log(`Multipart upload ${file.name} succeeded, url === `, url)
+  }).catch(err => {
+    console.log(`Multipart upload ${file.name} failed === `, err);
+  });
+}
+```
+
+## 9. 断点续传
+
+```
+// 断点续传
+async function resumeMultipartUpload() {
+  Object.values(checkpoints).forEach((checkpoint) => {
+    const { uploadId, file, name } = checkpoint;
+    ossClient.multipartUpload(uploadId, file, {
+      parallel,
+      partSize,
+      progress: onMultipartUploadProgress,
+      checkpoint
+    }).then(result => {
+      console.log('before delete checkpoints === ', checkpoints);
+      delete checkpoints[checkpoint.uploadId];
+      console.log('after delete checkpoints === ', checkpoints);
+      const url = `http://${bucket}.${region}.aliyuncs.com/${name}`;
+      console.log(`Resume multipart upload ${file.name} succeeded, url === `, url)
+    }).catch(err => {
+      console.log('Resume multipart upload failed === ', err);
+    });
+  });
+}
+```
+
+## 10. 分片上传进度
+
+在 progress 回调中我们可以判断 STS Token 是否快过期了，如果快过期了则先取消上传获取新 Token 后在从之前的断点开始续传。
+
+```
+// 分片上传进度改变回调
+async function onMultipartUploadProgress(progress, checkpoint) {
+  console.log(`${checkpoint.file.name} 上传进度 ${progress}`);
+  checkpoints[checkpoint.uploadId] = checkpoint;
+  // 判断STS Token是否将要过期，过期则重新获取
+  const { Expiration } = credentials;
+  const timegap = 1;
+  if (Expiration && moment(Expiration).subtract(timegap, 'minute').isBefore(moment())) {
+    console.log(`STS token will expire in ${timegap} minutes，uploading will pause and resume after getting new STS token`);
+    if (ossClient) {
+      ossClient.cancel();
+    }
+    await getCredential();
+    await resumeMultipartUpload();
+  }
+}
+```
+
+# 11. 暂停、续传按钮点击事件
+
+```
+function stop() {
+  status.innerText = 'Stopping';
+  if (ossClient) ossClient.cancel();
+}
+
+function resume() {
+  status.innerText = 'Resuming';
+  if (ossClient) resumeMultipartUpload();
+}
+```
+
+# github 示例项目
+
+项目地址：https://github.com/MudOnTire/aliyun-oss-upload-demo。如果对大家有帮助，star一下吧。
